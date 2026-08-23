@@ -218,3 +218,6 @@ __marimo__/
 .streamlit/secrets.toml
 .DS_Store
 .vscode/settings.json
+last_mention_id.txt
+previous_posts.json
+temp.png
