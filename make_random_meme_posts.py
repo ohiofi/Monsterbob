@@ -2,6 +2,17 @@ import os, sys
 import random
 from mastodon import Mastodon
 from dotenv import load_dotenv
+from pathlib import Path
+import logging
+
+PROJECT_DIR = Path(__file__).resolve().parent
+LOGS_DIR = PROJECT_DIR / "logs"
+LOGS_DIR.mkdir(parents=True, exist_ok=True)
+logging.basicConfig(
+    filename=LOGS_DIR / "monsterbob.log",
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s"
+)
 
 load_dotenv()
 
@@ -9,23 +20,28 @@ devilgirl_path = os.getenv("DEVILGIRL_PATH")
 if devilgirl_path and devilgirl_path not in sys.path:
     sys.path.insert(0, devilgirl_path)
 
+
+
 from shared_utils import (
     load_sentences, 
     save_sentences, 
     update_history, 
+    select_random_image,
     make_image, 
     build_alt_text
 )
 
-# Initialize Mastodon connection
-# Using the same credentials as your previous main.py
 mastodon = Mastodon(
-    client_id=os.getenv("client_key"),
-    client_secret=os.getenv("client_secret"),
-    access_token=os.getenv("access_token"),
-    api_base_url="https://mastodon.social",
+    client_id=os.getenv("MONSTERBOB_CLIENT_KEY"),
+    client_secret=os.getenv("MONSTERBOB_CLIENT_SECRET"),
+    access_token=os.getenv("MONSTERBOB_ACCESS_TOKEN"),
+    api_base_url=os.getenv("MONSTERBOB_BASE_URL", "https://mastodon.social"),
     request_timeout=40
 )
+
+MONSTERBOB_WIDTH = 640
+MONSTERBOB_HEIGHT = 480
+MONSTERBOB_IMAGES_DIR = os.path.join(os.getcwd(), "images")
 
 def run_random_meme_post():
     """
@@ -33,7 +49,6 @@ def run_random_meme_post():
     posts it, and logs the source/result to history.
     """
     
-    # 2. LOAD THE SENTENCE POOL
     # This reads the possible_sentences.json populated by your scraper
     pool = load_sentences()
     
@@ -41,7 +56,7 @@ def run_random_meme_post():
         print("DEBUG: The sentence pool is empty. Please run the scraper script.")
         return False
 
-    # 3. SELECT AND REMOVE A SENTENCE
+    # SELECT AND REMOVE A SENTENCE
     # We pick one at random to use for the post
     selection = random.choice(pool)
     sentence = selection['sentence']
@@ -54,10 +69,21 @@ def run_random_meme_post():
     print(f"DEBUG: Selected sentence: {sentence[:50]}...")
 
     try:
-        # 4. GENERATE THE MEME IMAGE
-        # Standardizes the image creation and alt text generation
-        png_path = make_image(sentence)
-        alt_text = build_alt_text(sentence)
+        # 1. Select the base image
+        image_path = select_random_image(MONSTERBOB_IMAGES_DIR)
+        print(f"DEBUG: Selected image: {os.path.basename(image_path)}")
+
+        # 2. Render meme with specific dimensions
+        png_path = make_image(
+            image_path=image_path,
+            user_text=sentence, 
+            target_size=(640, 480)
+        )
+        
+        alt_text = build_alt_text(
+            sentence, 
+            subject="A SpongeBob SquarePants meme"
+        )
 
         # 5. UPLOAD MEDIA & POST TO MASTODON
         print("DEBUG: Uploading media...")
